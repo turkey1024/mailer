@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>发信</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 520px; margin: 40px auto; padding: 0 16px; color: #222; }
+  h2 { margin-bottom: 4px; }
+  label { font-size: 14px; color: #555; }
+  input, textarea, button { width: 100%; box-sizing: border-box; padding: 10px; margin: 6px 0 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
+  textarea { font-family: inherit; }
+  button { background: #2563eb; color: #fff; border: none; cursor: pointer; font-weight: 600; }
+  button:disabled { opacity: .6; }
+  #login { text-align: center; padding: 60px 0; }
+  #login input { max-width: 280px; }
+  #result { white-space: pre-wrap; font-size: 13px; background: #f5f5f5; padding: 10px; border-radius: 6px; min-height: 20px; }
+  .ok { color: #16a34a; } .err { color: #dc2626; }
+</style>
+</head>
+<body>
+  <!-- 登录 -->
+  <div id="login">
+    <h2>输入密码</h2>
+    <input type="password" id="pw" placeholder="访问密码" onkeydown="if(event.key==='Enter')enter()">
+    <button onclick="enter()">进入</button>
+  </div>
+
+  <!-- 发信表单 -->
+  <div id="mail" style="display:none">
+    <h2>发邮件</h2>
+    <label>发件人</label>
+    <input id="from" value="noreply@你的域名">  <!-- ← 改成你的发件地址 -->
+    <label>收件人</label>
+    <input id="to" placeholder="收件人@example.com">
+    <label>主题</label>
+    <input id="subject" placeholder="主题">
+    <label>正文</label>
+    <textarea id="text" rows="8" placeholder="正文内容"></textarea>
+    <button id="sendBtn" onclick="send()">发送</button>
+    <div id="result"></div>
+  </div>
+
+<script>
+  function enter() {
+    const pw = document.getElementById('pw').value.trim();
+    if (!pw) return;
+    sessionStorage.setItem('token', pw);
+    showMail();
+  }
+  function showMail() {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('mail').style.display = 'block';
+  }
+  async function send() {
+    const btn = document.getElementById('sendBtn');
+    const res = document.getElementById('result');
+    btn.disabled = true; res.className = ''; res.textContent = '发送中...';
+    const body = {
+      token: sessionStorage.getItem('token'),
+      from: document.getElementById('from').value.trim(),
+      to: document.getElementById('to').value.trim(),
+      subject: document.getElementById('subject').value.trim(),
+      text: document.getElementById('text').value,
+    };
+    try {
+      const r = await fetch('/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await r.text();
+      if (r.ok) {
+        res.className = 'ok';
+        res.textContent = '已发送（Resend 返回：' + data + '）';
+      } else {
+        res.className = 'err';
+        res.textContent = '失败：' + data;
+        if (r.status === 403) sessionStorage.removeItem('token');
+      }
+    } catch (e) {
+      res.className = 'err';
+      res.textContent = '网络错误：' + e;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
