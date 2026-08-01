@@ -1,7 +1,17 @@
 export async function onRequestPost({ request, env }) {
   try {
-    const mail = await request.json();
-    const sender = mail.from?.email;
+    const payload = await request.json();
+
+    // 只处理 Resend inbound 的收件事件
+    if (payload.type !== "email.received") {
+      return new Response("ignored", { status: 200 });
+    }
+
+    const mail = payload.data || {};
+    // Resend 格式：from 是 "名字 <email>"
+    const senderFull = mail.from || "";
+    const m = senderFull.match(/<([^>]+)>/);
+    const sender = m ? m[1] : senderFull;
     const subject = mail.subject || "";
 
     // 防循环：无发件人、退信、自动回复主题，跳过
