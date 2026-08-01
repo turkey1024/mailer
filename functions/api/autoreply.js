@@ -31,6 +31,11 @@ export async function onRequestPost({ request, env }) {
       .replace(/\{subject\}/g, subject)
       .replace(/\{from\}/g, env.DEFAULT_FROM);
 
+    // 可选：回复正文内联图片（REPLY_IMAGE_URL 环境变量）
+    const html = env.REPLY_IMAGE_URL
+      ? `${replyText.split("\n").map((l) => (l ? `<p>${l}</p>` : "")).join("")}<p><img src="${env.REPLY_IMAGE_URL}" style="max-width:100%;border-radius:8px"></p>`
+      : undefined;
+
     await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -42,6 +47,7 @@ export async function onRequestPost({ request, env }) {
         to: [sender],
         subject: `Re: ${subject}`,
         text: replyText,
+        ...(html ? { html } : {}),
       }),
     });
     return new Response("ok", { status: 200 });
