@@ -34,7 +34,7 @@ export async function onRequestPost({ request, env }) {
     // 可选：回复正文内联图片（REPLY_IMAGE_URL 环境变量）
     const imgUrl = env.REPLY_IMAGE_URL || "https://claw-oss-01.lhl.one/20260416/37fc9206d998eb69c564bfa2817bc004.png";
     const html = imgUrl
-      ? `${replyText.split("\n").map((l) => (l ? `<p>${l}</p>` : "")).join("")}<p><img src="${imgUrl}" style="max-width:100%;border-radius:8px"></p>`
+      ? `<p><b>【自动回复】</b></p>${replyText.split("\n").map((l) => (l ? `<p>${l}</p>` : "")).join("")}<p><img src="${imgUrl}" style="max-width:100%;border-radius:8px"></p>`
       : undefined;
 
     await fetch("https://api.resend.com/emails", {
@@ -46,8 +46,8 @@ export async function onRequestPost({ request, env }) {
       body: JSON.stringify({
         from: env.DEFAULT_FROM,
         to: [sender],
-        subject: `Re: ${subject}`,
-        text: replyText,
+        subject: `[自动回复] ${subject}`,
+        text: `【自动回复】\n\n${replyText}`,
         ...(html ? { html } : {}),
       }),
     });
