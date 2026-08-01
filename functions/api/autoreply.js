@@ -26,7 +26,11 @@ export async function onRequestPost({ request, env }) {
     }
     await env.KV.put(`replied:${sender}`, String(Date.now()), { expirationTtl: 86400 });
 
-    // 发自动回复
+    // 发自动回复（文案来自环境变量 REPLY_TEXT，支持 {subject} 占位符）
+    const replyText = (env.REPLY_TEXT || `你好，\n\n我已收到你的邮件，会尽快回复。\n\n—— ${env.DEFAULT_FROM}`)
+      .replace(/\{subject\}/g, subject)
+      .replace(/\{from\}/g, env.DEFAULT_FROM);
+
     await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -37,7 +41,7 @@ export async function onRequestPost({ request, env }) {
         from: env.DEFAULT_FROM,
         to: [sender],
         subject: `Re: ${subject}`,
-        text: `你好，\n\n我已收到你的邮件（主题：${subject}），会尽快回复。\n\n—— ${env.DEFAULT_FROM}`,
+        text: replyText,
       }),
     });
     return new Response("ok", { status: 200 });
