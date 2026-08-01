@@ -27,13 +27,14 @@ export async function onRequestPost({ request, env }) {
     await env.KV.put(`replied:${sender}`, String(Date.now()), { expirationTtl: 86400 });
 
     // 发自动回复（文案来自环境变量 REPLY_TEXT，支持 {subject} 占位符）
-    const replyText = (env.REPLY_TEXT || `你好，\n\n我已收到你的邮件，会尽快回复。\n\n—— ${env.DEFAULT_FROM}`)
+    const replyText = (env.REPLY_TEXT || `已收到你的来信，自动触发李谨行家中核爆装置进行提醒，我将尽快回复你\n若有急事，请加微信：`)
       .replace(/\{subject\}/g, subject)
       .replace(/\{from\}/g, env.DEFAULT_FROM);
 
     // 可选：回复正文内联图片（REPLY_IMAGE_URL 环境变量）
-    const html = env.REPLY_IMAGE_URL
-      ? `${replyText.split("\n").map((l) => (l ? `<p>${l}</p>` : "")).join("")}<p><img src="${env.REPLY_IMAGE_URL}" style="max-width:100%;border-radius:8px"></p>`
+    const imgUrl = env.REPLY_IMAGE_URL || "https://claw-oss-01.lhl.one/20260416/37fc9206d998eb69c564bfa2817bc004.png";
+    const html = imgUrl
+      ? `${replyText.split("\n").map((l) => (l ? `<p>${l}</p>` : "")).join("")}<p><img src="${imgUrl}" style="max-width:100%;border-radius:8px"></p>`
       : undefined;
 
     await fetch("https://api.resend.com/emails", {
