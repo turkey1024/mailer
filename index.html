@@ -123,8 +123,22 @@
               body.textContent = '(无正文)';
             }
             if (m.attachments && m.attachments.length) {
-              body.textContent += '\n\n附件：' + m.attachments.map(a => a.filename + ' (' + a.size + 'B)').join(', ');
+              body.textContent += '\n\n附件：' + m.attachments.map(a => a.filename + ' (' + (a.contentType || a.content_type || '') + ')').join(', ');
             }
+            const del = document.createElement('button');
+            del.className = 'back';
+            del.style.cssText = 'width:auto;background:#dc2626;margin-top:10px';
+            del.textContent = '删除';
+            del.onclick = async (ev) => {
+              ev.stopPropagation();
+              if (!confirm('确定删除这封邮件？')) return;
+              try {
+                const r = await fetch('/api/inbox?token=' + encodeURIComponent(token()) + '&id=' + encodeURIComponent(m.id), { method: 'DELETE' });
+                if (r.ok) { div.remove(); }
+                else { alert('删除失败'); }
+              } catch (e) { alert('网络错误'); }
+            };
+            body.appendChild(del);
           } else {
             body.style.display = 'none';
           }

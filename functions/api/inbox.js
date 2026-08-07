@@ -34,3 +34,15 @@ export async function onRequestGet({ request, env }) {
   }
   return json({ total: list.keys.length, mails });
 }
+
+export async function onRequestDelete({ request, env }) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token");
+  if (token !== env.SITE_TOKEN) {
+    return json({ error: "密码错误" }, 403);
+  }
+  const id = url.searchParams.get("id");
+  if (!id) return json({ error: "缺少 id" }, 400);
+  await env.KV.delete(`mail:${id}`);
+  return json({ deleted: true, id });
+}
