@@ -14,20 +14,36 @@ export async function onRequestPost({ request, env }) {
     const sender = m ? m[1] : senderFull;
     const subject = mail.subject || "";
 
-    // 收件箱：把邮件存进 KV（附件只存元数据，不存 base64 内容）
+    // Resend webhook 只有元数据，正文要走 Received emails API 拉
+    let full = {};
+    const emailId = mail.email_id || mail.id || "";
+    if (emailId) {
+      try {
+        const r = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
+          headers: { "Authorization": `Bearer ${env.RESEND_API_KEY}` },
+        });
+        if (r.ok) full = await r.json();
+      } catch (e) { /* 拉取失败则存元数据 */ }
+    }
+
+    // 收件箱：把邮件存进 KV（附件只存元数据，不存文件内容）
     try {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const html = (mail.html || "").slice(0, 200000);
       await env.KV.put(`mail:${id}`, JSON.stringify({
         id,
+        email_id: emailId,
         from: senderFull || sender,
-        to: mail.to || "",
+        to: Array.isArray(mail.to) ? mail.to.join(", ") : (mail.to || ""),
         subject,
-        text: (mail.text || "").slice(0, 50000),
-        html,
-        date: new Date().toISOString(),
+        text: (full.text || mail.text || "").slice(0, 50000),
+        html: (full.html || mail.html || "").slice(0, 200000),
+        date: (full.created_at || new Date()).toISOString?.() || new Date().toISOString(),
         attachments: Array.isArray(mail.attachments)
-          ? mail.attachments.map((a) => ({ filename: a.filename || "", contentType: a.contentType || "", size: (a.content || "").length || 0 }))
+          ? mail.attachments.map((a) => ({
+              filename: a.filename || "",
+              contentType: a.content_type || a.contentType || "",
+              size: 0,
+            }))
           : [],
       }));
     } catch (e) {
