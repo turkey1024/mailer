@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>发信</title>
+<title>Mailer</title>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 520px; margin: 40px auto; padding: 0 16px; color: #222; }
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #222; }
   h2 { margin-bottom: 4px; }
   label { font-size: 14px; color: #555; }
   input, textarea, button { width: 100%; box-sizing: border-box; padding: 10px; margin: 6px 0 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
@@ -16,6 +16,17 @@
   #login input { max-width: 280px; }
   #result { white-space: pre-wrap; font-size: 13px; background: #f5f5f5; padding: 10px; border-radius: 6px; min-height: 20px; }
   .ok { color: #16a34a; } .err { color: #dc2626; }
+  .tabbar { display: flex; gap: 8px; margin: 12px 0 20px; }
+  .tab { padding: 8px 18px; border-radius: 8px; background: #eee; cursor: pointer; font-weight: 600; font-size: 14px; border: none; color: #555; width: auto; }
+  .tab.active { background: #2563eb; color: #fff; }
+  .mail-item { border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; }
+  .mail-item:hover { background: #f5f8ff; }
+  .mail-item .t { font-weight: 600; font-size: 15px; }
+  .mail-item .meta { font-size: 12px; color: #888; margin-top: 3px; }
+  .mail-body { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+  .mail-body iframe { width: 100%; border: none; background: #fff; }
+  .back { width: auto; background: #888; margin-bottom: 10px; }
+  .small { font-size: 12px; color: #888; margin: 8px 0; }
 </style>
 </head>
 <body>
@@ -26,19 +37,32 @@
     <button onclick="enter()">进入</button>
   </div>
 
-  <!-- 发信表单 -->
-  <div id="mail" style="display:none">
-    <h2>发邮件</h2>
-    <label>发件人</label>
-    <input id="from" value="i@i.l.cd">
-    <label>收件人</label>
-    <input id="to" placeholder="收件人@example.com">
-    <label>主题</label>
-    <input id="subject" placeholder="主题">
-    <label>正文</label>
-    <textarea id="text" rows="8" placeholder="正文内容"></textarea>
-    <button id="sendBtn" onclick="send()">发送</button>
-    <div id="result"></div>
+  <div id="app" style="display:none">
+    <div class="tabbar">
+      <button class="tab" id="tabMail" onclick="showTab('mail')">发信</button>
+      <button class="tab" id="tabInbox" onclick="showTab('inbox')">收件箱</button>
+    </div>
+
+    <!-- 发信 -->
+    <div id="mail" style="display:none">
+      <h2>发邮件</h2>
+      <label>发件人</label>
+      <input id="from" value="i@i.l.cd">
+      <label>收件人</label>
+      <input id="to" placeholder="收件人@example.com">
+      <label>主题</label>
+      <input id="subject" placeholder="主题">
+      <label>正文</label>
+      <textarea id="text" rows="8" placeholder="正文内容"></textarea>
+      <button id="sendBtn" onclick="send()">发送</button>
+      <div id="result"></div>
+    </div>
+
+    <!-- 收件箱 -->
+    <div id="inbox" style="display:none">
+      <h2>收件箱 <button class="back" onclick="loadInbox()" style="width:auto;background:#888">刷新</button></h2>
+      <div id="inboxList"></div>
+    </div>
   </div>
 
 <script>
@@ -46,18 +70,77 @@
     const pw = document.getElementById('pw').value.trim();
     if (!pw) return;
     sessionStorage.setItem('token', pw);
-    showMail();
-  }
-  function showMail() {
     document.getElementById('login').style.display = 'none';
-    document.getElementById('mail').style.display = 'block';
+    document.getElementById('app').style.display = 'block';
+    showTab('mail');
+  }
+  function showTab(name) {
+    document.getElementById('tabMail').className = 'tab' + (name === 'mail' ? ' active' : '');
+    document.getElementById('tabInbox').className = 'tab' + (name === 'inbox' ? ' active' : '');
+    document.getElementById('mail').style.display = name === 'mail' ? 'block' : 'none';
+    document.getElementById('inbox').style.display = name === 'inbox' ? 'block' : 'none';
+    if (name === 'inbox') loadInbox();
+  }
+  function token() { return sessionStorage.getItem('token'); }
+  function esc(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function fmtDate(iso) {
+    try { return new Date(iso).toLocaleString('zh-CN', { hour12: false }); } catch (e) { return iso || ''; }
+  }
+  async function loadInbox() {
+    const el = document.getElementById('inboxList');
+    el.innerHTML = '<div class="small">加载中...</div>';
+    try {
+      const r = await fetch('/api/inbox?token=' + encodeURIComponent(token()));
+      if (r.status === 403) { sessionStorage.removeItem('token'); el.innerHTML = '<div class="err">密码错误</div>'; return; }
+      const data = await r.json();
+      if (!data.mails || data.mails.length === 0) {
+        el.innerHTML = '<div class="small">暂无邮件。发到 auto@ciikare.resend.app 的信会出现在这里。</div>';
+        return;
+      }
+      el.innerHTML = '<div class="small">共 ' + data.total + ' 封，显示最新 ' + data.mails.length + ' 封</div>';
+      data.mails.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'mail-item';
+        div.innerHTML = '<div class="t">' + esc(m.subject || '(无主题)') + '</div>' +
+          '<div class="meta">' + esc(m.from || '') + ' · ' + fmtDate(m.date) + '</div>' +
+          '<div class="mail-body" style="display:none"></div>';
+        div.onclick = () => {
+          const body = div.querySelector('.mail-body');
+          if (body.style.display === 'none') {
+            body.style.display = 'block';
+            if (m.text) {
+              body.textContent = m.text;
+            } else if (m.html) {
+              const iframe = document.createElement('iframe');
+              iframe.sandbox = 'allow-same-origin';
+              iframe.style.height = '300px';
+              iframe.srcdoc = m.html;
+              body.textContent = '';
+              body.appendChild(iframe);
+            } else {
+              body.textContent = '(无正文)';
+            }
+            if (m.attachments && m.attachments.length) {
+              body.textContent += '\n\n附件：' + m.attachments.map(a => a.filename + ' (' + a.size + 'B)').join(', ');
+            }
+          } else {
+            body.style.display = 'none';
+          }
+        };
+        el.appendChild(div);
+      });
+    } catch (e) {
+      el.innerHTML = '<div class="err">网络错误：' + esc(e) + '</div>';
+    }
   }
   async function send() {
     const btn = document.getElementById('sendBtn');
     const res = document.getElementById('result');
     btn.disabled = true; res.className = ''; res.textContent = '发送中...';
     const body = {
-      token: sessionStorage.getItem('token'),
+      token: token(),
       from: document.getElementById('from').value.trim(),
       to: document.getElementById('to').value.trim(),
       subject: document.getElementById('subject').value.trim(),

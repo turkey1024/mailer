@@ -14,6 +14,26 @@ export async function onRequestPost({ request, env }) {
     const sender = m ? m[1] : senderFull;
     const subject = mail.subject || "";
 
+    // 收件箱：把邮件存进 KV（附件只存元数据，不存 base64 内容）
+    try {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const html = (mail.html || "").slice(0, 200000);
+      await env.KV.put(`mail:${id}`, JSON.stringify({
+        id,
+        from: senderFull || sender,
+        to: mail.to || "",
+        subject,
+        text: (mail.text || "").slice(0, 50000),
+        html,
+        date: new Date().toISOString(),
+        attachments: Array.isArray(mail.attachments)
+          ? mail.attachments.map((a) => ({ filename: a.filename || "", contentType: a.contentType || "", size: (a.content || "").length || 0 }))
+          : [],
+      }));
+    } catch (e) {
+      // 存储失败不影响自动回复
+    }
+
     // 防循环：无发件人、退信、自动回复主题，跳过
     if (!sender || /^(out of office|auto|autoreply|自动回复|undeliverable|delivery status|mail delivery)/i.test(subject.trim())) {
       return new Response("skipped", { status: 200 });
