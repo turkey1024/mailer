@@ -63,7 +63,7 @@ export async function onRequestPost({ request, env }) {
     await env.KV.put(`replied:${sender}`, String(Date.now()), { expirationTtl: 86400 });
 
     // 发自动回复（文案来自环境变量 REPLY_TEXT，支持 {subject} 占位符）
-    const replyText = (env.REPLY_TEXT || `已收到你的来信，自动触发李谨行家中核爆装置进行提醒，我将尽快回复你\n若有急事，请加微信：`)
+    const replyText = (env.REPLY_TEXT || `已收到来信，工作日无法回复\n微信：wxid_b6320udsdwdr22`)
       .replace(/\{subject\}/g, subject)
       .replace(/\{from\}/g, env.DEFAULT_FROM);
 
